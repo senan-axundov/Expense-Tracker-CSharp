@@ -1,41 +1,15 @@
-
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text.Json;
-
-enum TransactionType
-{
-    Income,
-    Expense
-}
-
-class Transaction
-{
-    public string Description { get; set; } = "";
-    public decimal Amount { get; set; }
-    public TransactionType Type { get; set; }
-    public DateTime Date { get; set; }
-
-    public Transaction(string description, decimal amount, TransactionType type)
-    {
-        Description = description;
-        Amount = amount;
-        Type = type;
-        Date = DateTime.Now;
-    }
-}
 
 class Program
 {
-    static List<Transaction> transactions = new List<Transaction>();
-    static string filePath = "transactions.json";
+    static List<string> descriptions = new List<string>();
+    static List<decimal> amounts = new List<decimal>();
+    static List<string> types = new List<string>();
 
-    static void Main()
+    static void Main(string[] args)
     {
-        LoadTransactions();
-
         while (true)
         {
             Console.WriteLine("\n===== EXPENSE TRACKER =====");
@@ -53,11 +27,11 @@ class Program
             switch (choice)
             {
                 case "1":
-                    AddTransaction(TransactionType.Income);
+                    AddTransaction("Income");
                     break;
 
                 case "2":
-                    AddTransaction(TransactionType.Expense);
+                    AddTransaction("Expense");
                     break;
 
                 case "3":
@@ -77,8 +51,7 @@ class Program
                     break;
 
                 case "0":
-                    SaveTransactions();
-                    Console.WriteLine("Data saved. Goodbye!");
+                    Console.WriteLine("Goodbye!");
                     return;
 
                 default:
@@ -88,7 +61,7 @@ class Program
         }
     }
 
-    static void AddTransaction(TransactionType type)
+    static void AddTransaction(string type)
     {
         Console.Write("Description: ");
         string description = Console.ReadLine() ?? "";
@@ -100,78 +73,81 @@ class Program
         }
 
         Console.Write("Amount: ");
+        decimal amount;
 
-        if (!decimal.TryParse(Console.ReadLine(), out decimal amount)
+        if (!decimal.TryParse(Console.ReadLine(), out amount)
             || amount <= 0)
         {
             Console.WriteLine("Enter a valid positive amount!");
             return;
         }
 
-        Transaction transaction =
-            new Transaction(description, amount, type);
-
-        transactions.Add(transaction);
-        SaveTransactions();
+        descriptions.Add(description);
+        amounts.Add(amount);
+        types.Add(type);
 
         Console.WriteLine("Transaction added successfully!");
     }
 
     static void ShowTransactions()
     {
-        if (transactions.Count == 0)
+        if (descriptions.Count == 0)
         {
             Console.WriteLine("No transactions found.");
             return;
         }
 
-        for (int i = 0; i < transactions.Count; i++)
+        for (int i = 0; i < descriptions.Count; i++)
         {
-            Transaction t = transactions[i];
-
             Console.WriteLine(
-                $"{i + 1}. [{t.Type}] {t.Description} | " +
-                $"{t.Amount:F2} AZN | {t.Date:dd.MM.yyyy HH:mm}"
+                (i + 1) + ". [" + types[i] + "] " +
+                descriptions[i] + " | " +
+                amounts[i].ToString("F2") + " AZN"
             );
         }
     }
 
     static void ShowBalance()
     {
-        decimal income = transactions
-            .Where(t => t.Type == TransactionType.Income)
-            .Sum(t => t.Amount);
+        decimal income = 0;
+        decimal expenses = 0;
 
-        decimal expenses = transactions
-            .Where(t => t.Type == TransactionType.Expense)
-            .Sum(t => t.Amount);
+        for (int i = 0; i < amounts.Count; i++)
+        {
+            if (types[i] == "Income")
+                income += amounts[i];
+            else
+                expenses += amounts[i];
+        }
 
-        Console.WriteLine($"Total income: {income:F2} AZN");
-        Console.WriteLine($"Total expenses: {expenses:F2} AZN");
-        Console.WriteLine($"Balance: {income - expenses:F2} AZN");
+        Console.WriteLine("Total income: " + income.ToString("F2") + " AZN");
+        Console.WriteLine("Total expenses: " + expenses.ToString("F2") + " AZN");
+        Console.WriteLine("Balance: " + (income - expenses).ToString("F2") + " AZN");
     }
 
     static void ShowStatistics()
     {
-        int incomeCount = transactions
-            .Count(t => t.Type == TransactionType.Income);
+        int incomeCount = types.Count(t => t == "Income");
+        int expenseCount = types.Count(t => t == "Expense");
 
-        int expenseCount = transactions
-            .Count(t => t.Type == TransactionType.Expense);
+        Console.WriteLine("Income transactions: " + incomeCount);
+        Console.WriteLine("Expense transactions: " + expenseCount);
+        Console.WriteLine("Total transactions: " + descriptions.Count);
 
-        Console.WriteLine($"Income transactions: {incomeCount}");
-        Console.WriteLine($"Expense transactions: {expenseCount}");
-        Console.WriteLine($"Total transactions: {transactions.Count}");
-
-        if (transactions.Count > 0)
+        if (amounts.Count > 0)
         {
-            Transaction largest = transactions
-                .OrderByDescending(t => t.Amount)
-                .First();
+            int largestIndex = 0;
+
+            for (int i = 1; i < amounts.Count; i++)
+            {
+                if (amounts[i] > amounts[largestIndex])
+                    largestIndex = i;
+            }
 
             Console.WriteLine(
-                $"Largest transaction: {largest.Description} " +
-                $"({largest.Amount:F2} AZN, {largest.Type})"
+                "Largest transaction: " +
+                descriptions[largestIndex] + " (" +
+                amounts[largestIndex].ToString("F2") + " AZN)"
             );
         }
     }
@@ -180,56 +156,26 @@ class Program
     {
         ShowTransactions();
 
-        if (transactions.Count == 0)
+        if (descriptions.Count == 0)
             return;
 
         Console.Write("Enter transaction number to delete: ");
+        int number;
 
-        if (!int.TryParse(Console.ReadLine(), out int number)
+        if (!int.TryParse(Console.ReadLine(), out number)
             || number < 1
-            || number > transactions.Count)
+            || number > descriptions.Count)
         {
             Console.WriteLine("Invalid transaction number!");
             return;
         }
 
-        transactions.RemoveAt(number - 1);
-        SaveTransactions();
+        int index = number - 1;
+
+        descriptions.RemoveAt(index);
+        amounts.RemoveAt(index);
+        types.RemoveAt(index);
 
         Console.WriteLine("Transaction deleted successfully!");
-    }
-
-    static void SaveTransactions()
-    {
-        string json = JsonSerializer.Serialize(
-            transactions,
-            new JsonSerializerOptions { WriteIndented = true }
-        );
-
-        File.WriteAllText(filePath, json);
-    }
-
-    static void LoadTransactions()
-    {
-        if (!File.Exists(filePath))
-            return;
-
-        try
-        {
-            string json = File.ReadAllText(filePath);
-
-            transactions =
-                JsonSerializer.Deserialize<List<Transaction>>(json)
-                ?? new List<Transaction>();
-        }
-        catch (JsonException)
-        {
-            Console.WriteLine("Warning: Saved data could not be read.");
-            transactions = new List<Transaction>();
-        }
-        catch (IOException)
-        {
-            Console.WriteLine("Warning: Could not access the data file.");
-        }
     }
 }
